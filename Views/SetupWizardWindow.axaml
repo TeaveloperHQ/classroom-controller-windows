@@ -1,0 +1,125 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ClassroomController.Views.SetupWizardWindow"
+        Width="440" Height="600"
+        MinWidth="380" MinHeight="480"
+        WindowStartupLocation="CenterScreen"
+        Title="교실 컨트롤러 설정">
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- 헤더 -->
+        <Border Grid.Row="0" Background="#1976d2" Padding="16,14">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <Button Grid.Column="0" Name="BackButton" Content="‹" FontSize="22"
+                        Background="Transparent" Foreground="White"
+                        VerticalAlignment="Center" Click="OnBack" IsVisible="False" />
+                <TextBlock Grid.Column="1" Name="TitleText" Text="교실 컨트롤러 설정"
+                           Foreground="White" FontSize="18" FontWeight="Bold"
+                           VerticalAlignment="Center" Margin="8,0,0,0" />
+                <TextBlock Grid.Column="2" Name="StepText" Text="1/5"
+                           Foreground="#E3F2FD" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+
+        <!-- 본문 -->
+        <Panel Grid.Row="1" Margin="24">
+
+            <!-- Step 0: 환영 -->
+            <StackPanel Name="Step0" Spacing="18" VerticalAlignment="Center">
+                <TextBlock Text="👋" FontSize="48" HorizontalAlignment="Center" />
+                <TextBlock Text="교실 컨트롤러에 오신 것을 환영합니다"
+                           FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"
+                           TextAlignment="Center" TextWrapping="Wrap" />
+                <TextBlock Text="학생 태블릿을 탐색하고 수업을 관리하기 위한 초기 설정을 진행합니다. 약 1분이면 완료됩니다."
+                           Foreground="#616161" HorizontalAlignment="Center"
+                           TextAlignment="Center" TextWrapping="Wrap" />
+                <Button Content="시작하기" HorizontalAlignment="Center"
+                        Background="#1976d2" Foreground="White"
+                        Padding="32,12" FontSize="16" Click="OnStartWizard" />
+            </StackPanel>
+
+            <!-- Step 1: 교실 설정 -->
+            <StackPanel Name="Step1" Spacing="16" IsVisible="False">
+                <TextBlock Text="관리할 학급" FontSize="18" FontWeight="Bold" />
+                <TextBlock Text="기기 이름이 이 학년+반으로 시작하는 태블릿만 관리 대상이 됩니다."
+                           Foreground="#616161" FontSize="12" TextWrapping="Wrap" />
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
+                      ColumnSpacing="12" RowSpacing="12" Margin="0,8,0,0">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="학년" VerticalAlignment="Center" />
+                    <ComboBox Grid.Row="0" Grid.Column="1" Name="GradeBox" HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="반" VerticalAlignment="Center" />
+                    <ComboBox Grid.Row="1" Grid.Column="1" Name="ClassBox" HorizontalAlignment="Stretch" />
+                </Grid>
+                <Button Content="다음" HorizontalAlignment="Right"
+                        Background="#1976d2" Foreground="White"
+                        Padding="28,10" Click="OnStep1Next" />
+            </StackPanel>
+
+            <!-- Step 2: 태블릿 탐색 -->
+            <StackPanel Name="Step2" Spacing="16" IsVisible="False">
+                <TextBlock Text="태블릿 탐색" FontSize="18" FontWeight="Bold" />
+                <TextBlock Text="같은 네트워크의 학생 태블릿을 자동으로 찾고 있습니다. 태블릿에서 ClassroomAgent가 실행 중이어야 합니다."
+                           Foreground="#616161" FontSize="12" TextWrapping="Wrap" />
+                <Border Background="#F5F5F5" CornerRadius="8" Padding="20" Margin="0,8">
+                    <StackPanel Spacing="6" HorizontalAlignment="Center">
+                        <TextBlock Name="DiscoveryCount" Text="0대 발견됨"
+                                   FontSize="24" FontWeight="Bold" HorizontalAlignment="Center" />
+                        <TextBlock Text="탐색 중..." Foreground="#9e9e9e"
+                                   HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                    <Button Grid.Column="0" Content="다시 탐색"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            Click="OnRetryDiscovery" />
+                    <Button Grid.Column="1" Name="Step2Next" Content="다음"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            Background="#1976d2" Foreground="White"
+                            IsEnabled="False" Click="OnStep2Next" />
+                </Grid>
+            </StackPanel>
+
+            <!-- Step 3: 허용 앱 설정 -->
+            <Grid Name="Step3" RowDefinitions="Auto,*,Auto" IsVisible="False">
+                <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,10">
+                    <TextBlock Text="허용 앱 설정" FontSize="18" FontWeight="Bold" />
+                    <TextBlock Name="Step3Desc"
+                               Text="발견된 태블릿에서 설치된 앱 목록을 수집하여 허용할 앱을 선택합니다."
+                               Foreground="#616161" FontSize="12" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <Button Grid.Row="1" Name="AnalyzeButton" Content="앱 분석 시작"
+                        VerticalAlignment="Center" HorizontalAlignment="Center"
+                        Background="#1976d2" Foreground="White"
+                        Padding="28,12" FontSize="15" Click="OnAnalyze" />
+
+                <Border Grid.Row="1" Name="AppListBorder"
+                        BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="6"
+                        IsVisible="False">
+                    <ScrollViewer>
+                        <StackPanel Name="WizardAppList" Margin="10" Spacing="2" />
+                    </ScrollViewer>
+                </Border>
+
+                <Button Grid.Row="2" Name="Step3Next" Content="다음"
+                        HorizontalAlignment="Right" Margin="0,12,0,0"
+                        Background="#1976d2" Foreground="White"
+                        Padding="28,10" IsVisible="False" Click="OnStep3Next" />
+            </Grid>
+
+            <!-- Step 4: 완료 -->
+            <StackPanel Name="Step4" Spacing="18" VerticalAlignment="Center" IsVisible="False">
+                <TextBlock Text="✅" FontSize="48" HorizontalAlignment="Center" />
+                <TextBlock Text="설정 완료" FontSize="20" FontWeight="Bold"
+                           HorizontalAlignment="Center" />
+                <TextBlock Name="SummaryText" Foreground="#616161"
+                           HorizontalAlignment="Center" TextAlignment="Center"
+                           TextWrapping="Wrap" />
+                <Button Content="시작하기" HorizontalAlignment="Center"
+                        Background="#2e7d32" Foreground="White"
+                        Padding="32,12" FontSize="16" Click="OnFinish" />
+            </StackPanel>
+
+        </Panel>
+    </Grid>
+</Window>

@@ -1,0 +1,101 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:ClassroomController.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="720"
+        x:Class="ClassroomController.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/app.ico"
+        Width="480" Height="720"
+        MinWidth="380" MinHeight="480"
+        Title="교실 컨트롤러">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="0">
+
+        <!-- 헤더 -->
+        <Border Grid.Row="0" Background="#1976d2" Padding="16,12">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="교실 컨트롤러" Foreground="White"
+                               FontSize="20" FontWeight="Bold" />
+                    <TextBlock Text="{Binding Subtitle}" Foreground="#E3F2FD"
+                               FontSize="13" Margin="0,2,0,0" />
+                </StackPanel>
+                <Button Grid.Column="1" Content="📱" FontSize="18"
+                        Background="Transparent" Foreground="White"
+                        VerticalAlignment="Center"
+                        Click="OnAppSettingsClick"
+                        ToolTip.Tip="허용 앱 설정" />
+                <Button Grid.Column="2" Content="⚙" FontSize="18"
+                        Background="Transparent" Foreground="White"
+                        VerticalAlignment="Center"
+                        ToolTip.Tip="설정">
+                    <Button.Flyout>
+                        <MenuFlyout>
+                            <MenuItem Header="🏫 학급 설정" Click="OnClassroomSettingsClick" />
+                            <MenuItem Header="🧙 설정 마법사 재실행" Click="OnRerunWizardClick" />
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- 자동 종료 배너 -->
+        <Border Grid.Row="1" Background="#FFF3E0" Padding="16,10"
+                IsVisible="{Binding AutoStopVisible}">
+            <StackPanel>
+                <TextBlock Text="{Binding AutoStopText}" Foreground="#E65100"
+                           FontWeight="SemiBold" />
+                <ProgressBar Minimum="0" Maximum="300"
+                             Value="{Binding AutoStopProgress}"
+                             Foreground="#E65100" Margin="0,6,0,0" />
+            </StackPanel>
+        </Border>
+
+        <!-- 기기 목록 -->
+        <ListBox Grid.Row="2" ItemsSource="{Binding Devices}"
+                 Background="#FAFAFA" Padding="8"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:DeviceViewModel">
+                    <Border Background="White" CornerRadius="8" Margin="0,4"
+                            Padding="0" BoxShadow="0 1 3 0 #22000000">
+                        <Grid ColumnDefinitions="6,*,Auto">
+                            <!-- 상태 색상 바 -->
+                            <Border Grid.Column="0" Background="{Binding StatusBrush}"
+                                    CornerRadius="8,0,0,8" />
+                            <StackPanel Grid.Column="1" Margin="12,10" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding NameWithBadge}"
+                                           FontSize="15" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding StatusText}"
+                                           Foreground="{Binding StatusBrush}"
+                                           FontSize="13" Margin="0,2,0,0"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <CheckBox Grid.Column="2" Margin="8,0,12,0"
+                                      VerticalAlignment="Center"
+                                      IsChecked="{Binding IsChecked, Mode=TwoWay}" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- 하단 버튼 -->
+        <Grid Grid.Row="3" ColumnDefinitions="*,*" Margin="16,12">
+            <Button Grid.Column="0" Content="수업 시작"
+                    Command="{Binding StartSessionCommand}"
+                    IsEnabled="{Binding CanStart}"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                    Background="#2e7d32" Foreground="White"
+                    FontSize="16" Padding="0,12" Margin="0,0,6,0" />
+            <Button Grid.Column="1" Content="수업 종료"
+                    Command="{Binding StopSessionCommand}"
+                    IsEnabled="{Binding CanStop}"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                    Background="#d32f2f" Foreground="White"
+                    FontSize="16" Padding="0,12" Margin="6,0,0,0" />
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,14 @@
+## .NET / Avalonia
+bin/
+obj/
+publish/
+*.user
+*.suo
+
+## Rider / VS
+.idea/
+.vs/
+
+## OS
+.DS_Store
+Thumbs.db
