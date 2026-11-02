@@ -24,6 +24,9 @@ public sealed class SettingsService
     public bool WizardDone { get; set; }
     public bool IsInSession { get; set; }
 
+    /// <summary>사용자가 트레이 메뉴에서 자동 실행을 끈 경우 true (다시 등록하지 않음).</summary>
+    public bool AutostartDisabled { get; set; }
+
     /// <summary>허용 앱 패키지명 목록.</summary>
     public HashSet<string> AllowedApps { get; set; } = new();
 

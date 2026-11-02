@@ -30,6 +30,10 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     private bool _started;
 
+    // 수업 중 목록에서 사라진 태블릿 이름. 다시 나타나거나 수업이 끝날 때까지 경고로 남긴다
+    // (학생이 에이전트를 끄면 목록에서 빠지므로, 이게 없으면 트레이가 '문제 없음'으로 돌아간다).
+    private readonly HashSet<string> _lostInSession = new();
+
     public ObservableCollection<DeviceViewModel> Devices { get; } = new();
 
     [ObservableProperty] private string _subtitle = "";
@@ -40,6 +44,14 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     private bool _isInSession;
 
     public bool CanStart => !IsInSession;
+
+    // 수업 중에만 화면 꺼짐/절전 방지 (트레이 상주 앱이라 항상 막지는 않는다).
+    partial void OnIsInSessionChanged(bool value)
+    {
+        _lostInSession.Clear();
+        IssuesChanged?.Invoke();
+        if (value) KeepAwake.Enable(); else KeepAwake.Disable();
+    }
     public bool CanStop => IsInSession;
 
     [ObservableProperty] private bool _autoStopVisible;
@@ -51,6 +63,22 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     public event Action<string, string>? EditRequestReceived;
     /// <summary>경보 알림. (title, text)</summary>
     public event Action<string, string>? AlertRaised;
+    /// <summary>문제 있는 태블릿 집계가 바뀔 수 있음 (트레이 아이콘 갱신용).</summary>
+    public event Action? IssuesChanged;
+
+    /// <summary>현재 문제가 있는 태블릿 수.</summary>
+    public int IssueCount => Devices.Count(d => d.Issue != DeviceIssue.None) + _lostInSession.Count;
+
+    /// <summary>문제 요약. 예: "우회 시도 1대 · 통신 끊김 2대" (문제 없으면 빈 문자열).</summary>
+    public string IssueSummary => string.Join(" · ", Devices
+        .Where(d => d.Issue != DeviceIssue.None)
+        .GroupBy(d => d.Issue)
+        .OrderBy(g => g.Key)
+        .Select(g => $"{DeviceViewModel.IssueLabel(g.Key)} {g.Count()}대")
+        .Concat(_lostInSession.Count > 0 ? new[] { $"연결 사라짐 {_lostInSession.Count}대" } : Array.Empty<string>()));
+
+    /// <summary>현재 학급 표시 (예: "1학년 1반 · 태블릿 3대").</summary>
+    public string ClassroomLabel => Subtitle;
 
     public bool NeedsClassroomSetup => !_settings.FilterSet;
     public bool NeedsWizard => !_settings.WizardDone;
@@ -88,6 +116,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     public void Shutdown()
     {
+        KeepAwake.Disable();
         _discovery.Stop();
         _pollTimer.Stop();
         _countdownTimer.Stop();
@@ -110,7 +139,9 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         Devices.Clear();
         _editPending.Clear();
         _lastSuspicious.Clear();
+        _lostInSession.Clear();
         UpdateSubtitle();
+        IssuesChanged?.Invoke();
         _discovery.Restart();
         OnPropertyChanged(nameof(NeedsClassroomSetup));
     }
@@ -121,7 +152,9 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         Devices.Clear();
         _editPending.Clear();
         _lastSuspicious.Clear();
+        _lostInSession.Clear();
         UpdateSubtitle();
+        IssuesChanged?.Invoke();
         OnPropertyChanged(nameof(NeedsClassroomSetup));
         OnPropertyChanged(nameof(NeedsWizard));
         if (_settings.FilterSet)
@@ -174,6 +207,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     {
         if (Devices.Any(d => d.Address == address)) return;
 
+        _lostInSession.Remove(name);
         Devices.Add(new DeviceViewModel(address, name));
 
         // 허용 앱 목록이 있으면 즉시 전달 (원본 동작).
@@ -182,16 +216,27 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
         UpdateSubtitle();
         CheckPeakAndAutoStop();
+        IssuesChanged?.Invoke();
     });
 
     private void OnDeviceLost(string address) => Dispatcher.UIThread.Post(() =>
     {
         var device = Devices.FirstOrDefault(d => d.Address == address);
-        if (device != null) Devices.Remove(device);
+        if (device != null)
+        {
+            Devices.Remove(device);
+            // 수업 중 태블릿이 사라짐 = 에이전트 종료/와이파이 끊김 가능성.
+            if (IsInSession)
+            {
+                _lostInSession.Add(device.Name);
+                AlertRaised?.Invoke("태블릿 연결 사라짐", $"{device.Name}: 목록에서 사라졌습니다");
+            }
+        }
         _editPending.Remove(address);
         _lastSuspicious.Remove(address);
         UpdateSubtitle();
         CheckPeakAndAutoStop();
+        IssuesChanged?.Invoke();
     });
 
     // ──────────────────────────────────────────────
@@ -213,10 +258,12 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         {
             if (!Devices.Contains(device)) return;
 
+            var previousIssue = device.Issue;
+
             if (response == null)
             {
                 device.MarkUnreachable();
-                SortDevices();
+                AfterStatusApplied(device, previousIssue);
                 return;
             }
 
@@ -246,7 +293,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
                     var text = string.IsNullOrEmpty(time)
                         ? $"{device.Name} 학생이 차단된 앱 사용을 시도했습니다"
                         : $"{device.Name} 학생이 차단된 앱 사용을 시도했습니다 ({time})";
-                    AlertRaised?.Invoke("⚠️ 우회 시도 감지", text);
+                    AlertRaised?.Invoke("우회 시도 감지", text);
                 }
             }
             else
@@ -255,8 +302,26 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             }
 
             device.Apply(status, ResolveAppName);
-            SortDevices();
+            AfterStatusApplied(device, previousIssue);
         });
+    }
+
+    /// <summary>
+    /// 상태 반영 후: 새로 생긴 문제를 알리고 정렬·트레이를 갱신한다.
+    /// 우회 시도는 위에서 이미 알렸고, 통신 끊김/권한 꺼짐은 수업 중에만 알린다
+    /// (수업이 끝나 태블릿을 끈 것까지 알리면 소음이 되므로). 트레이 아이콘은 항상 실제 상태를 보여준다.
+    /// </summary>
+    private void AfterStatusApplied(DeviceViewModel device, DeviceIssue previousIssue)
+    {
+        var issue = device.Issue;
+        if (issue != previousIssue && issue != DeviceIssue.None
+            && issue != DeviceIssue.Bypass && IsInSession)
+        {
+            AlertRaised?.Invoke("태블릿 문제",
+                $"{device.Name}: {DeviceViewModel.IssueLabel(issue)}");
+        }
+        SortDevices();
+        IssuesChanged?.Invoke();
     }
 
     private string ResolveAppName(string pkg) => _settings.CachedAppMap.GetValueOrDefault(pkg, pkg);
@@ -339,7 +404,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         AutoStopProgress = 0;
         AutoStopText = $"자동 종료 대기중 · 현재 {Devices.Count}대";
         _countdownTimer.Start();
-        AlertRaised?.Invoke("⏳ 자동 수업 종료 예정",
+        AlertRaised?.Invoke("자동 수업 종료 예정",
             "태블릿 1/3 이상 오프라인. 5분 후 수업이 자동 종료됩니다");
     }
 
@@ -375,7 +440,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         IsInSession = false;
         _settings.IsInSession = false;
         _settings.Save();
-        AlertRaised?.Invoke("🔓 수업 종료", "수업이 자동 종료되었습니다");
+        AlertRaised?.Invoke("수업 자동 종료", "수업이 자동 종료되었습니다");
     }
 
     // ──────────────────────────────────────────────
@@ -401,5 +466,6 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         var classNumInt = _settings.ClassNum.TrimStart('0');
         if (string.IsNullOrEmpty(classNumInt)) classNumInt = "0";
         Subtitle = $"{_settings.Grade}학년 {classNumInt}반 · 태블릿 {Devices.Count}대";
+        OnPropertyChanged(nameof(ClassroomLabel));
     }
 }

@@ -16,8 +16,6 @@ public static class ConfirmDialog
         var positive = new Button
         {
             Content = positiveText,
-            Background = new SolidColorBrush(Color.Parse("#1976d2")),
-            Foreground = Brushes.White,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Center,
             Padding = new Thickness(0, 10, 0, 10),
@@ -25,11 +23,14 @@ public static class ConfirmDialog
         var negative = new Button
         {
             Content = negativeText,
-            Foreground = new SolidColorBrush(Color.Parse("#d32f2f")),
             HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Center,
             Padding = new Thickness(0, 10, 0, 10),
         };
+
+        // 허락 = Teavel 그라데이션, 거절 = 빨간 텍스트 (Android 편집 요청 다이얼로그와 동일)
+        positive.Classes.Add("primary");
+        negative.Classes.Add("dangerText");
 
         var buttons = new Grid
         {

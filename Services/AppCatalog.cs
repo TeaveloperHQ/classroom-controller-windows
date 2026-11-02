@@ -14,7 +14,7 @@ public static class AppCatalog
     public static readonly IReadOnlyList<string> DefaultPackages = new[]
     {
         "com.microsoft.office.onenote",
-        "com.yourname.classroomagent",
+        "com.teaveloper.classroomagent",
         "com.android.systemui",
         "com.google.android.inputmethod.latin",
         "com.samsung.android.honeyboard",
