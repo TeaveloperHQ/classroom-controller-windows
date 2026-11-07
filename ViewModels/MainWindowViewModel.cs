@@ -28,6 +28,11 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     // 우회 알림 중복 방지: address -> 마지막 SUSPICIOUS 값
     private readonly Dictionary<string, string> _lastSuspicious = new();
 
+    // BLOCK_LOG 중복 방지: address -> 마지막으로 파일에 쓴 엔트리.
+    // 수업 중에만 쓰이고 폴링 스레드 여러 개가 접근하므로 lock 필요.
+    private readonly Dictionary<string, string> _lastBlockEntry = new();
+    private readonly object _blockLogLock = new();
+
     private bool _started;
 
     // 수업 중 목록에서 사라진 태블릿 이름. 다시 나타나거나 수업이 끝날 때까지 경고로 남긴다
@@ -253,6 +258,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     private async System.Threading.Tasks.Task PollOneAsync(DeviceViewModel device)
     {
         var response = await AgentClient.QueryStatusAsync(device.Address).ConfigureAwait(false);
+        _ = CollectBlockLogAsync(device);
 
         Dispatcher.UIThread.Post(() =>
         {
@@ -325,6 +331,45 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     }
 
     private string ResolveAppName(string pkg) => _settings.CachedAppMap.GetValueOrDefault(pkg, pkg);
+
+    /// <summary>
+    /// BLOCK_LOG 를 조회해 이전 폴링에서 못 본 새 엔트리만 파일에 append.
+    /// S Pen 지우개 오탐 등 어떤 시스템 패키지가 튀는지 수집해서 튜닝용으로 쓴다.
+    /// </summary>
+    private async System.Threading.Tasks.Task CollectBlockLogAsync(DeviceViewModel device)
+    {
+        var response = await AgentClient.QueryBlockLogAsync(device.Address).ConfigureAwait(false);
+        if (response == null || !response.StartsWith("BLOCK_LOG|")) return;
+        var payload = response.Substring("BLOCK_LOG|".Length);
+        if (string.IsNullOrEmpty(payload) || payload == "empty") return;
+
+        var entries = payload
+            .Split('|', StringSplitOptions.RemoveEmptyEntries)
+            .ToList();
+        if (entries.Count == 0) return;
+
+        List<string> fresh;
+        lock (_blockLogLock)
+        {
+            var lastSeen = _lastBlockEntry.GetValueOrDefault(device.Address);
+            if (lastSeen == null)
+            {
+                fresh = entries;
+            }
+            else
+            {
+                var idx = entries.FindIndex(e => e == lastSeen);
+                fresh = idx >= 0 && idx < entries.Count - 1
+                    ? entries.GetRange(idx + 1, entries.Count - idx - 1)
+                    : (idx == entries.Count - 1 ? new List<string>() : entries);
+            }
+            if (fresh.Count > 0)
+                _lastBlockEntry[device.Address] = entries[entries.Count - 1];
+        }
+
+        if (fresh.Count > 0)
+            BlockLogService.Append(device.Name, fresh);
+    }
 
     // ──────────────────────────────────────────────
     // 명령

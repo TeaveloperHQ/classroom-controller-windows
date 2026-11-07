@@ -52,6 +52,10 @@ public static class AgentClient
     public static Task<string?> QueryStatusAsync(string address) =>
         SendAsync(address, "STATUS", expectResponse: true);
 
+    /// <summary>BLOCK_LOG 를 질의하여 에이전트의 차단/무시 이벤트 링버퍼를 받아온다.</summary>
+    public static Task<string?> QueryBlockLogAsync(string address) =>
+        SendAsync(address, "BLOCK_LOG", expectResponse: true);
+
     private static async Task<string?> ReceiveTextAsync(ClientWebSocket ws, CancellationToken token)
     {
         var buffer = new byte[8192];
