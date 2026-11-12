@@ -39,6 +39,9 @@ public partial class App : Application
     private readonly List<(string title, string text)> _pendingAlerts = new();
     private DispatcherTimer? _alertFlushTimer;
 
+    // 다른 창에 가려지지 않는 경고 팝업 (교사가 확인할 때까지 남음).
+    private AlertPopup? _alertPopup;
+
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
     public override void OnFrameworkInitializationCompleted()
@@ -73,6 +76,12 @@ public partial class App : Application
             var trayOnly = desktop.Args?.Contains("--tray") == true;
             if (!trayOnly || !setupDone)
                 Dispatcher.UIThread.Post(ShowMainWindow);
+
+            // --test-alert: 3초 뒤 샘플 경고 (팝업·알림·깜빡임 확인용).
+            if (desktop.Args?.Contains("--test-alert") == true)
+                DispatcherTimer.RunOnce(
+                    () => OnAlertRaised("우회 시도 감지 (테스트)", "1번 태블릿: 차단된 앱 실행 시도"),
+                    TimeSpan.FromSeconds(3));
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -121,6 +130,7 @@ public partial class App : Application
         }
 
         _exiting = true;
+        _alertPopup?.Close();
         _vm.Shutdown();
         if (_tray != null)
         {
@@ -278,8 +288,13 @@ public partial class App : Application
 
     private void OnAlertRaised(string title, string text)
     {
-        // 창을 보고 있지 않을 때만 깜빡인다 (창이 앞에 있으면 이미 보고 있는 것).
-        if (!_window.IsActive) StartBlink();
+        // 창을 보고 있지 않을 때만 깜빡이고, 다른 창 위로 경고 팝업을 띄운다
+        // (창이 앞에 있으면 이미 보고 있는 것이므로 창 안 배너로 충분).
+        if (!_window.IsActive)
+        {
+            StartBlink();
+            ShowAlertPopup(title, text);
+        }
         _window.ShowInAppAlert(title, text);
         _window.FlashTaskbar();
 
@@ -290,6 +305,20 @@ public partial class App : Application
             _alertFlushTimer.Tick += (_, _) => FlushAlerts();
         }
         if (!_alertFlushTimer.IsEnabled) _alertFlushTimer.Start();
+    }
+
+    private void ShowAlertPopup(string title, string text)
+    {
+        if (_alertPopup == null)
+        {
+            _alertPopup = new AlertPopup();
+            _alertPopup.Dismissed += openMain =>
+            {
+                StopBlink();
+                if (openMain) ShowMainWindow();
+            };
+        }
+        _alertPopup.Add(title, text);
     }
 
     /// <summary>모인 알림을 Windows 토스트로 보낸다 (여러 건이면 한 장으로 묶음).</summary>
